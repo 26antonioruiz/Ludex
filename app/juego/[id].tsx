@@ -1,115 +1,168 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
   Linking,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native'
-import { getPrices } from '../../lib/prices'
-import { getStore } from '../../lib/stores'
-import { priceAlertSchema } from '../../lib/validation'
+
+import { useEffect, useState } from 'react'
+
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+import { useLocalSearchParams } from 'expo-router'
+
+import { LinearGradient } from 'expo-linear-gradient'
+
+import { Ionicons } from '@expo/vector-icons'
+
 import { useAppStore } from '../../store/useAppStore'
 
-const API_KEY = '3348181a516f4e3ba8ddef56af9a9d03'
+import { getPrices } from '../../lib/prices'
+
+import { getStore } from '../../lib/stores'
+
+const API_KEY =
+  '3348181a516f4e3ba8ddef56af9a9d03'
 
 export default function GameDetail() {
   const { id } = useLocalSearchParams()
-  const router = useRouter()
 
-  const gameId = Array.isArray(id) ? id[0] : id
+  const [game, setGame] =
+    useState<any>(null)
 
-  const { wishlist, toggleWishlist, setPriceAlert } = useAppStore()
+  const [prices, setPrices] =
+    useState<any[]>([])
 
-  const [game, setGame] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [prices, setPrices] = useState<any[]>([])
+  const [loading, setLoading] =
+    useState(true)
 
-  const isSaved = wishlist.some((g) => g.id === game?.id)
+  const { wishlist, toggleWishlist } =
+    useAppStore()
+
+  const isSaved = wishlist.some(
+    (g) => g.id === game?.id  
+  )
+
+  const bestDeal = prices[0]
+
+  const bestStore = bestDeal
+    ? getStore(
+        Number(bestDeal.storeID)
+      )
+    : null
 
   useEffect(() => {
-    if (!gameId) return
+    loadGame()
+  }, [])
 
-    const load = async () => {
-      try {
-        const res = await fetch(
-          `https://api.rawg.io/api/games/${gameId}?key=${API_KEY}`
-        )
-        const data = await res.json()
-
-        if (!data || data.detail || !data.id) {
-          setGame(null)
-          return
-        }
-
-        // 🔥 LIMPIAR DESCRIPCIÓN
-        const rawDesc =
-          data.description_raw || data.description || ''
-
-        const cleanDescription = rawDesc
-          .replace(/<[^>]+>/g, '')
-          .replace(/\n/g, ' ')
-          .slice(0, 500)
-
-        setGame({
-          ...data,
-          description_clean: cleanDescription,
-        })
-
-        const deals = await getPrices(data.name)
-        setPrices(deals || [])
-      } catch {
-        setGame(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    load()
-  }, [gameId])
-
-  // 🔔 ALERTA
-  const handleAlert = () => {
+  const saveViewedGame = async (
+    gameId: number
+  ) => {
     try {
-      const price = Number(prices?.[0]?.price)
+      const stored =
+        await AsyncStorage.getItem(
+          'viewed-games'
+        )
 
-      priceAlertSchema.parse({ price })
+      const viewed = stored
+        ? JSON.parse(stored)
+        : []
 
-      if (!game) return
+      if (
+        !viewed.includes(gameId)
+      ) {
+        viewed.push(gameId)
 
-      setPriceAlert(game.id, price)
-
-      alert(`🔔 Te avisaremos cuando baje de ${price}€`)
-    } catch (e: any) {
-      alert(e?.errors?.[0]?.message || 'Error')
+        await AsyncStorage.setItem(
+          'viewed-games',
+          JSON.stringify(viewed)
+        )
+      }
+    } catch (error) {
+      console.log(error)
     }
   }
 
-  // 🔄 LOADING
+  const loadGame = async () => {
+    try {
+      setLoading(true)
+
+      const res = await fetch(
+        `https://api.rawg.io/api/games/${id}?key=${API_KEY}`
+      )
+
+      const data = await res.json()
+
+      setGame(data)
+
+      await saveViewedGame(
+        data.id
+      )
+
+      const deals = await getPrices(
+        data.name
+      )
+
+      setPrices(deals || [])
+    } catch (error) {
+      console.log(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color="#22c55e" size="large" />
-        <Text style={{ color: '#22c55e', marginTop: 10 }}>
-          🎮 Cargando juego...
+      <View
+        style={{
+          flex: 1,
+          backgroundColor:
+            '#020617',
+          justifyContent:
+            'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator
+          size="large"
+          color="#22c55e"
+        />
+
+        <Text
+          style={{
+            color: 'white',
+            marginTop: 20,
+            fontSize: 16,
+          }}
+        >
+          Cargando juego...
         </Text>
       </View>
     )
   }
 
-  // ❌ NO GAME
   if (!game) {
     return (
-      <View style={styles.center}>
-        <Text style={{ color: '#fff', fontSize: 18 }}>
-          🎮 Ups... no encontramos este juego
-        </Text>
-        <Text style={{ color: '#94a3b8', marginTop: 8 }}>
-          Prueba con otro o vuelve atrás
+      <View
+        style={{
+          flex: 1,
+          backgroundColor:
+            '#020617',
+          justifyContent:
+            'center',
+          alignItems: 'center',
+        }}
+      >
+        <Text
+          style={{
+            color: 'white',
+            fontSize: 20,
+          }}
+        >
+          Juego no encontrado
         </Text>
       </View>
     )
@@ -117,204 +170,395 @@ export default function GameDetail() {
 
   return (
     <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 140 }}
+      style={{
+        flex: 1,
+        backgroundColor:
+          '#020617',
+      }}
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      {/* 🔙 BACK */}
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backText}>← Volver</Text>
-      </Pressable>
+      {/* HERO */}
+      <View>
+        <Image
+          source={{
+            uri:
+              game.background_image,
+          }}
+          style={{
+            width: '100%',
+            height: 380,
+          }}
+          resizeMode="cover"
+        />
 
-      {/* 🎮 IMAGEN */}
-      <Image
-        source={{
-          uri:
-            game.background_image ||
-            'https://via.placeholder.com/500x300',
-        }}
-        style={styles.image}
-      />
+        <LinearGradient
+          colors={[
+            'transparent',
+            '#020617',
+          ]}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 220,
+          }}
+        />
 
-      {/* 🎯 TITULO */}
-      <Text style={styles.title}>{game.name}</Text>
+        {/* WISHLIST */}
+        <Pressable
+          onPress={() =>
+            toggleWishlist({
+              id: game.id,
+              name: game.name,
+              image:
+                game.background_image,
+            })
+          }
+          style={{
+            position:
+              'absolute',
+            top: 60,
+            right: 20,
 
-      {/* ⭐ WISHLIST */}
-      <Pressable
-        onPress={() =>
-          toggleWishlist({
-            id: game.id,
-            name: game.name,
-            image: game.background_image,
-          })
-        }
-        style={[
-          styles.wishlistButton,
-          { backgroundColor: isSaved ? '#ef4444' : '#22c55e' },
-        ]}
-      >
-        <Text style={styles.wishlistText}>
-          {isSaved ? '💔 Quitar de Wishlist' : '⭐ Añadir a Wishlist'}
-        </Text>
-      </Pressable>
+            width: 56,
+            height: 56,
 
-      {/* 🔔 ALERTA */}
-      {prices.length > 0 && (
-        <Pressable style={styles.alertButton} onPress={handleAlert}>
-          <Text style={styles.alertText}>
-            🔔 Avisar cuando baje de {prices[0]?.price}€
-          </Text>
+            borderRadius: 28,
+
+            backgroundColor:
+              'rgba(0,0,0,0.7)',
+
+            justifyContent:
+              'center',
+            alignItems: 'center',
+          }}
+        >
+          <Ionicons
+            name={
+              isSaved
+                ? 'heart'
+                : 'heart-outline'
+            }
+            size={30}
+            color={
+              isSaved
+                ? '#ef4444'
+                : 'white'
+            }
+          />
         </Pressable>
-      )}
 
-      {/* 📊 META */}
-      <Text style={styles.meta}>
-        ⭐ {game.rating}   📅 {game.released}
-      </Text>
+        {/* INFO */}
+        <View
+          style={{
+            position:
+              'absolute',
+            bottom: 25,
+            left: 20,
+            right: 20,
+          }}
+        >
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 38,
+              fontWeight: '900',
+            }}
+          >
+            {game.name}
+          </Text>
 
-      {/* 🎮 TAGS */}
-      {game.genres && (
-        <View style={styles.tags}>
-          {game.genres.slice(0, 3).map((g: any) => (
-            <Text key={g.id} style={styles.tag}>
-              {g.name}
-            </Text>
-          ))}
-        </View>
-      )}
+          <Text
+            style={{
+              color: '#d4d4d8',
+              marginTop: 8,
+              fontSize: 16,
+            }}
+          >
+            ⭐ {game.rating} • 📅{' '}
+            {game.released}
+          </Text>
 
-      {/* 📝 DESCRIPCIÓN */}
-      <Text style={styles.desc}>
-        {game.description_clean}
-      </Text>
+          {bestDeal && (
+            <View
+              style={{
+                marginTop: 18,
 
-      {/* 💸 PRECIOS */}
-      {prices.length > 0 ? (
-        <>
-          <Text style={styles.sectionTitle}>💸 Mejores precios</Text>
+                backgroundColor:
+                  '#22c55e',
 
-          {prices.slice(0, 5).map((deal: any, index: number) => {
-            const store = getStore(Number(deal.storeID))
+                paddingHorizontal:
+                  18,
 
-            return (
-              <View
-                key={deal.dealID}
-                style={[
-                  styles.priceCard,
-                  index === 0 && styles.bestPrice,
-                ]}
+                paddingVertical:
+                  14,
+
+                borderRadius: 20,
+
+                alignSelf:
+                  'flex-start',
+              }}
+            >
+              <Text
+                style={{
+                  color:
+                    '#020617',
+                  fontSize: 12,
+                  fontWeight:
+                    '900',
+                }}
               >
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Image
-                    source={{ uri: store.logo }}
-                    style={{ width: 40, height: 40 }}
-                  />
+                🟢 MEJOR OFERTA
+              </Text>
 
-                  <View>
-                    <Text style={styles.storeName}>{store.name}</Text>
+              <Text
+                style={{
+                  color:
+                    '#020617',
+                  fontSize: 32,
+                  fontWeight:
+                    '900',
+                  marginTop: 4,
+                }}
+              >
+                {bestDeal.price}€
+              </Text>
 
-                    <Text style={styles.price}>
-                      💰 {deal.price}€
-                    </Text>
+              <Text
+                style={{
+                  color:
+                    '#020617',
+                  fontWeight:
+                    '700',
+                  marginTop: 2,
+                }}
+              >
+                {bestStore?.name}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
 
-                    {index === 0 && (
-                      <Text style={styles.bestLabel}>
-                        🟢 Mejor precio
-                      </Text>
-                    )}
-                  </View>
-                </View>
+      {/* CONTENT */}
+      <View
+        style={{
+          padding: 20,
+          paddingBottom: 140,
+        }}
+      >
+        {/* GENRES */}
+        <View
+          style={{
+            flexDirection:
+              'row',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          {game.genres?.map(
+            (genre: any) => (
+              <View
+                key={genre.id}
+                style={{
+                  backgroundColor:
+                    '#18181b',
 
+                  paddingHorizontal:
+                    16,
+
+                  paddingVertical:
+                    10,
+
+                  borderRadius:
+                    16,
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      '#22c55e',
+                    fontWeight:
+                      '600',
+                  }}
+                >
+                  {genre.name}
+                </Text>
+              </View>
+            )
+          )}
+        </View>
+
+        {/* DESCRIPTION */}
+        <View
+          style={{
+            marginTop: 36,
+          }}
+        >
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 28,
+              fontWeight: '800',
+              marginBottom: 16,
+            }}
+          >
+            Descripción
+          </Text>
+
+          <Text
+            style={{
+              color: '#d4d4d8',
+              fontSize: 16,
+              lineHeight: 28,
+            }}
+          >
+            {game.description_raw}
+          </Text>
+        </View>
+
+        {/* OFFERS */}
+        <View
+          style={{
+            marginTop: 40,
+          }}
+        >
+          <Text
+            style={{
+              color: 'white',
+              fontSize: 28,
+              fontWeight: '800',
+              marginBottom: 20,
+            }}
+          >
+            Mejores precios 💸
+          </Text>
+
+          {prices.map(
+            (
+              deal: any,
+              index
+            ) => {
+              const store =
+                getStore(
+                  Number(
+                    deal.storeID
+                  )
+                )
+
+              const isBest =
+                index === 0
+
+              return (
                 <Pressable
+                  key={
+                    deal.dealID
+                  }
                   onPress={() =>
                     Linking.openURL(
                       `https://www.cheapshark.com/redirect?dealID=${deal.dealID}`
                     )
                   }
-                  style={styles.buyButton}
+                  style={{
+                    backgroundColor:
+                      isBest
+                        ? '#22c55e'
+                        : '#18181b',
+
+                    padding: 22,
+
+                    borderRadius:
+                      28,
+
+                    marginBottom:
+                      18,
+
+                    flexDirection:
+                      'row',
+
+                    justifyContent:
+                      'space-between',
+
+                    alignItems:
+                      'center',
+                  }}
                 >
-                  <Text style={styles.buyText}>Comprar</Text>
+                  <View
+                    style={{
+                      flex: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          isBest
+                            ? '#020617'
+                            : 'white',
+
+                        fontSize: 24,
+
+                        fontWeight:
+                          '900',
+                      }}
+                    >
+                      {store.name}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color:
+                          isBest
+                            ? '#020617'
+                            : '#22c55e',
+
+                        fontSize: 34,
+
+                        fontWeight:
+                          '900',
+
+                        marginTop: 10,
+                      }}
+                    >
+                      💰 {deal.price}€
+                    </Text>
+
+                    {isBest && (
+                      <Text
+                        style={{
+                          color:
+                            '#020617',
+
+                          marginTop: 8,
+
+                          fontWeight:
+                            '800',
+
+                          fontSize: 15,
+                        }}
+                      >
+                        🟢 Mejor precio
+                      </Text>
+                    )}
+                  </View>
+
+                  <Ionicons
+                    name="open-outline"
+                    size={32}
+                    color={
+                      isBest
+                        ? '#020617'
+                        : '#22c55e'
+                    }
+                  />
                 </Pressable>
-              </View>
-            )
-          })}
-        </>
-      ) : (
-        <Text style={{ color: '#94a3b8', marginTop: 10 }}>
-          🔎 Buscando precios en tiendas...
-        </Text>
-      )}
+              )
+            }
+          )}
+        </View>
+      </View>
     </ScrollView>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#020617',
-    padding: 16,
-    paddingTop: 50,
-  },
-  center: {
-    flex: 1,
-    backgroundColor: '#020617',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButton: {
-    backgroundColor: '#0f172a',
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  backText: { color: '#22c55e' },
-  image: {
-    width: '100%',
-    height: 220,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
-  title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  wishlistButton: {
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 10,
-    alignItems: 'center',
-  },
-  wishlistText: { color: '#020617', fontWeight: 'bold' },
-  alertButton: {
-    backgroundColor: '#facc15',
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  alertText: { color: '#020617', fontWeight: 'bold' },
-  meta: { color: '#94a3b8', marginVertical: 10 },
-  tags: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  tag: {
-    backgroundColor: '#0f172a',
-    color: '#22c55e',
-    padding: 6,
-    borderRadius: 8,
-  },
-  desc: { color: '#cbd5f5', marginTop: 10 },
-  sectionTitle: { color: '#fff', fontSize: 18, marginTop: 20 },
-  priceCard: {
-    backgroundColor: '#0f172a',
-    padding: 10,
-    borderRadius: 10,
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  bestPrice: { backgroundColor: '#22c55e' },
-  storeName: { color: '#fff' },
-  price: { color: '#22c55e' },
-  bestLabel: { color: '#020617' },
-  buyButton: {
-    backgroundColor: '#020617',
-    padding: 6,
-    borderRadius: 6,
-  },
-  buyText: { color: '#22c55e' },
-})

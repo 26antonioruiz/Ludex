@@ -7,76 +7,155 @@ interface AppState {
   wishlist: WishlistGame[]
   compare: WishlistGame[]
 
-  toggleWishlist: (game: WishlistGame) => void
-  setPriceAlert: (id: number, price: number) => void
+  username: string
+  affiliateCode: string
 
-  addToCompare: (game: WishlistGame) => void
+  toggleWishlist: (
+    game: WishlistGame
+  ) => void
+
+  setPriceAlert: (
+    id: number,
+    price: number
+  ) => void
+
+  addToCompare: (
+    game: WishlistGame
+  ) => void
+
   clearCompare: () => void
+
+  setUsername: (
+    username: string
+  ) => void
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      wishlist: [],
-      compare: [],
+export const useAppStore =
+  create<AppState>()(
+    persist(
+      (set, get) => ({
+        wishlist: [],
 
-      // ⭐ Añadir / quitar wishlist
-      toggleWishlist: (game) => {
-        const list = get().wishlist
-        const exists = list.some((g) => g.id === game.id)
+        compare: [],
 
-        if (exists) {
+        username: 'Jugador',
+
+        affiliateCode:
+          'LUDEX-001',
+
+        // ⭐ Añadir / quitar wishlist
+        toggleWishlist: (
+          game
+        ) => {
+          const list =
+            get().wishlist
+
+          const exists =
+            list.some(
+              (g) =>
+                g.id === game.id
+            )
+
+          if (exists) {
+            set({
+              wishlist:
+                list.filter(
+                  (g) =>
+                    g.id !== game.id
+                ),
+            })
+          } else {
+            set({
+              wishlist: [
+                ...list,
+                {
+                  ...game,
+
+                  targetPrice:
+                    null,
+                },
+              ],
+            })
+          }
+        },
+
+        // 🔔 Alertas
+        setPriceAlert: (
+          id,
+          price
+        ) => {
+          const updated =
+            get().wishlist.map(
+              (g) =>
+                g.id === id
+                  ? {
+                      ...g,
+                      targetPrice:
+                        price,
+                    }
+                  : g
+            )
+
           set({
-            wishlist: list.filter((g) => g.id !== game.id),
+            wishlist:
+              updated,
           })
-        } else {
+        },
+
+        // ⚔️ Comparador
+        addToCompare: (
+          game
+        ) => {
+          const list =
+            get().compare
+
+          const exists =
+            list.some(
+              (g) =>
+                g.id === game.id
+            )
+
+          if (exists) return
+
+          let updated = [
+            ...list,
+          ]
+
+          if (
+            updated.length >= 2
+          ) {
+            updated.shift()
+          }
+
+          updated.push(game)
+
           set({
-            wishlist: [
-              ...list,
-              {
-                ...game,
-                targetPrice: null, // 🔥 importante para alertas
-              },
-            ],
+            compare: updated,
           })
-        }
-      },
+        },
 
-      // 🔔 Guardar alerta de precio
-      setPriceAlert: (id, price) => {
-        const updated = get().wishlist.map((g) =>
-          g.id === id ? { ...g, targetPrice: price } : g
-        )
+        clearCompare: () => {
+          set({
+            compare: [],
+          })
+        },
 
-        set({ wishlist: updated })
-      },
+        // 👤 Usuario
+        setUsername: (
+          username
+        ) => {
+          set({
+            username,
+          })
+        },
+      }),
+      {
+        name: 'app-storage',
 
-      // ⚔️ Comparador (máx 2 juegos)
-      addToCompare: (game) => {
-        const list = get().compare
-
-        const exists = list.some((g) => g.id === game.id)
-        if (exists) return
-
-        let updated = [...list]
-
-        if (updated.length >= 2) {
-          updated.shift() // elimina el primero
-        }
-
-        updated.push(game)
-
-        set({ compare: updated })
-      },
-
-      // 🧹 Limpiar comparador
-      clearCompare: () => {
-        set({ compare: [] })
-      },
-    }),
-    {
-      name: 'app-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-    }
+        storage:
+          createJSONStorage(
+            () => AsyncStorage
+          ),
+      }
+    )
   )
-)

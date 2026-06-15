@@ -1,19 +1,33 @@
 import { useRouter } from 'expo-router'
+
 import {
   Image,
   Pressable,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
-import { useAppStore } from '../store/useAppStore'
 
-export default function GameCard({ id, title, image }: any) {
+import { LinearGradient } from 'expo-linear-gradient'
+
+interface Props {
+  id: number
+  title: string
+  image: string
+}
+
+export default function GameCard({
+  id,
+  title,
+  image,
+}: Props) {
   const router = useRouter()
-  const { addToCompare } = useAppStore()
 
   return (
-    <TouchableOpacity
+    <Pressable
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir ${title}`}
+      accessibilityHint="Abre la ficha completa del juego"
       onPress={() =>
         router.push({
           pathname: '/juego/[id]',
@@ -21,42 +35,74 @@ export default function GameCard({ id, title, image }: any) {
         })
       }
       style={{
-        marginBottom: 16,
-        borderRadius: 14,
+        marginBottom: 24,
+        borderRadius: 24,
         overflow: 'hidden',
-        backgroundColor: '#0f172a',
+        backgroundColor: '#18181b',
       }}
     >
-      <Image
-        source={{ uri: image }}
-        style={{ width: '100%', height: 170 }}
-      />
-
-      <Pressable
-        onPress={() =>
-          addToCompare({
-            id,
-            name: title,
-            image,
-          })
-        }
+      <View
         style={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          backgroundColor: '#020617cc',
-          padding: 6,
-          borderRadius: 8,
+          position: 'relative',
         }}
       >
-        <Text style={{ color: '#22c55e' }}>⚔️</Text>
-      </Pressable>
+        <Image
+          source={{ uri: image }}
+          style={{
+            width: '100%',
+            height: 230,
+          }}
+          resizeMode="cover"
+          accessible={true}
+          accessibilityLabel={title}
+        />
 
-      <View style={{ padding: 12 }}>
-        <Text style={{ color: '#fff' }}>
-          {title}
-        </Text>
+        <LinearGradient
+          colors={[
+            'transparent',
+            'rgba(0,0,0,0.95)',
+          ]}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 140,
+          }}
+        />
+
+        {/* CONTENT */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 18,
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            style={{
+              color: 'white',
+              fontSize: 24,
+              fontWeight: 'bold',
+            }}
+          >
+            {title}
+          </Text>
+
+          <Text
+            style={{
+              color: '#a1a1aa',
+              marginTop: 6,
+              fontSize: 15,
+            }}
+          >
+            Ver detalles
+          </Text>
+        </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
